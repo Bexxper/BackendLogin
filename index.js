@@ -1,36 +1,11 @@
-// index.js - Mafia PS Style Full Final Version
+// index.js - Ultra-Minimal Mafia PS Style (ENet direct)
 const express = require('express');
-const compression = require('compression');
-const rateLimiter = require('express-rate-limit');
-const path = require('path');
 const getRawBody = require('raw-body');
 
 const app = express();
 
-// Middleware
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(compression({ level: 5, threshold: 0 }));
-app.use(
-  rateLimiter({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
-    headers: true,
-  })
-);
-
-// CORS & logging
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header(
-    'Access-Control-Allow-Headers',
-    'Origin, X-Requested-With, Content-Type, Accept'
-  );
-  console.log(`[${new Date().toLocaleString()}] ${req.method} ${req.url}`);
-  next();
-});
-
-// Helper: Safe parse raw body from ENet client
-function safeParseRaw(raw) {
+// Helper: parse raw body from ENet client
+function parseRaw(raw) {
   const data = {};
   raw.split(/\r?\n/).forEach(line => {
     const parts = line.split('|');
@@ -43,101 +18,68 @@ function safeParseRaw(raw) {
   return data;
 }
 
+// Parse ENet body safely
 async function parseENetBody(req) {
   try {
-    let raw = '';
-    try {
-      raw = (await getRawBody(req)).toString('utf-8');
-    } catch (e) {
-      console.log('Error reading raw body:', e);
-    }
-    return safeParseRaw(raw);
+    const raw = (await getRawBody(req)).toString('utf-8');
+    return parseRaw(raw);
   } catch (err) {
     console.log('Error parsing ENet body:', err);
     return {};
   }
 }
 
-// Root
+// Root - simple ping
 app.get('/', (req, res) => {
-  res.send('Welcome to Growtopia 2 - Mafia PS Style Login!');
+  res.send('Mafia PS Style Growtopia Backend - Ultra Minimal');
 });
 
-// Dashboard endpoint - bypass modal login
+// Dashboard - main login route
 app.all('/player/login/dashboard', async (req, res) => {
-  try {
-    const data = await parseENetBody(req);
-    console.log('Raw data received:', data);
-    const { growId, password } = data;
+  const data = await parseENetBody(req);
+  const { growId, password } = data;
 
-    if (growId && password) {
-      // Returning player → langsung validate
-      return res.redirect(307, '/player/growid/login/validate');
-    }
-
-    // First-time player → fallback guest token
-    const guestToken = Buffer.from(`growId=guest&password=guest`).toString('base64');
-    res.json({
-      status: 'success',
-      message: 'Guest login auto-generated',
-      token: guestToken,
-      url: '',
-      accountType: 'growtopia',
-      accountAge: 0
-    });
-
-  } catch (err) {
-    console.log('Error in /player/login/dashboard:', err);
-    const guestToken = Buffer.from(`growId=guest&password=guest`).toString('base64');
-    res.json({
-      status: 'success',
-      message: 'Guest login fallback',
-      token: guestToken,
-      url: '',
-      accountType: 'growtopia',
-      accountAge: 0
-    });
+  if (growId && password) {
+    // Returning player or first-time with account
+    return res.redirect(307, '/player/growid/login/validate');
   }
+
+  // Optional: fallback guest token
+  const guestToken = Buffer.from('growId=guest&password=guest').toString('base64');
+  res.json({
+    status: 'success',
+    message: 'Guest login auto-generated',
+    token: guestToken,
+    url: '',
+    accountType: 'growtopia',
+    accountAge: 0
+  });
 });
 
-// Validate login → generate token
+// Validate login - generate token
 app.all('/player/growid/login/validate', async (req, res) => {
-  try {
-    const data = await parseENetBody(req);
-    const growId = data.growId || 'guest';
-    const password = data.password || 'guest';
+  const data = await parseENetBody(req);
+  const growId = data.growId || 'guest';
+  const password = data.password || 'guest';
 
-    const token = Buffer.from(`growId=${growId}&password=${password}`).toString('base64');
+  const token = Buffer.from(`growId=${growId}&password=${password}`).toString('base64');
 
-    res.json({
-      status: "success",
-      message: "Account Validated.",
-      token,
-      url: "",
-      accountType: "growtopia",
-      accountAge: 2
-    });
-  } catch (err) {
-    console.log('Error in /player/growid/login/validate:', err);
-    const guestToken = Buffer.from(`growId=guest&password=guest`).toString('base64');
-    res.json({
-      status: 'success',
-      message: 'Guest login fallback',
-      token: guestToken,
-      url: '',
-      accountType: 'growtopia',
-      accountAge: 0
-    });
-  }
+  res.json({
+    status: 'success',
+    message: 'Account Validated.',
+    token,
+    url: '',
+    accountType: 'growtopia',
+    accountAge: 2
+  });
 });
 
-// Check token → validasi & refresh
+// Check token
 app.all('/player/growid/checktoken', async (req, res) => {
+  const data = await parseENetBody(req);
+  const refreshToken = data.refreshToken || '';
   try {
-    const data = await parseENetBody(req);
-    const refreshToken = data.refreshToken || '';
     const decoded = Buffer.from(refreshToken, 'base64').toString('utf-8');
-
     if (!decoded.includes('growId=')) throw new Error('Invalid token');
 
     res.json({
@@ -149,7 +91,7 @@ app.all('/player/growid/checktoken', async (req, res) => {
       accountAge: 2
     });
   } catch (e) {
-    const guestToken = Buffer.from(`growId=guest&password=guest`).toString('base64');
+    const guestToken = Buffer.from('growId=guest&password=guest').toString('base64');
     res.json({
       status: 'success',
       message: 'Guest token fallback',
@@ -161,13 +103,11 @@ app.all('/player/growid/checktoken', async (req, res) => {
   }
 });
 
-// VPS fallback (tidak untuk Vercel)
+// Listen for VPS (optional)
 if (process.env.SERVER_TYPE !== 'vercel') {
   const PORT = process.env.PORT || 5000;
-  app.listen(PORT, () => {
-    console.log(`Mafia PS Style backend running on port ${PORT}`);
-  });
+  app.listen(PORT, () => console.log(`Mafia PS Backend running on port ${PORT}`));
 }
 
-// Export untuk Vercel / serverless
+// Export for serverless
 module.exports = app;

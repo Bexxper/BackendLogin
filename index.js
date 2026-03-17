@@ -55,6 +55,15 @@ app.all('/player/login/dashboard', function (req, res) {
     }
     if (uName[1] && uPass[1]) {
       res.redirect('/player/growid/login/validate');
+      res.send(
+        JSON.stringify({
+          status: 'success',
+          message: 'Account Validated.',
+          token: "",
+          url: '',
+          accountType: 'growtopia',
+        }),
+      );
     }
   } catch (why) {
     console.log(`Warning: ${why}`);

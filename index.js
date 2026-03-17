@@ -49,29 +49,36 @@ app.all('/player/login/dashboard', function (req, res) {
     const uData = JSON.stringify(req.body).split('"')[1].split('\\n');
     const uName = uData[0].split('|');
     const uPass = uData[1].split('|');
+
     for (let i = 0; i < uData.length - 1; i++) {
       const d = uData[i].split('|');
       tData[d[0]] = d[1];
     }
-if (uName[1] && uPass[1]) {
 
-  const growId = uName[1];
-  const password = uPass[1];
+    if (uName[1] && uPass[1]) {
+      const growId = uName[1];
+      const password = uPass[1];
 
-  const token = Buffer.from(
-    `growId=${growId}&passwords=${password}`
-  ).toString('base64');
+      const token = Buffer.from(
+        `growId=${growId}&passwords=${password}`
+      ).toString('base64');
 
-  return res.send(JSON.stringify({
-    status: 'success',
-    message: 'Account Validated.',
-    token: token,
-    url: '70.153.137.6:17091',
-    accountType: 'growtopia',
-  }));
-}
+      return res.send(JSON.stringify({
+        status: 'success',
+        message: 'Account Validated.',
+        token: token,
+        url: '70.153.137.6:17091',
+        accountType: 'growtopia',
+        accountAge: 2
+      }));
+    }
 
-  res.render(__dirname + '/public/html/dashboard.ejs', { data: tData });
+  } catch (why) {
+    console.log(`Warning: ${why}`);
+  }
+
+  // ✅ HANYA jalan kalau tidak login
+  return res.render(__dirname + '/public/html/dashboard.ejs', { data: tData });
 });
 
 // Validasi login → generate token + accountAge: 2

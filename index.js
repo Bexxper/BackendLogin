@@ -53,21 +53,23 @@ app.all('/player/login/dashboard', function (req, res) {
       const d = uData[i].split('|');
       tData[d[0]] = d[1];
     }
-    if (uName[1] && uPass[1]) {
-      res.redirect('/player/growid/login/validate');
-      res.send(
-        JSON.stringify({
-          status: 'success',
-          message: 'Account Validated.',
-          token: "",
-          url: '',
-          accountType: 'growtopia',
-        }),
-      );
-    }
-  } catch (why) {
-    console.log(`Warning: ${why}`);
-  }
+if (uName[1] && uPass[1]) {
+
+  const growId = uName[1];
+  const password = uPass[1];
+
+  const token = Buffer.from(
+    `growId=${growId}&passwords=${password}`
+  ).toString('base64');
+
+  return res.send(JSON.stringify({
+    status: 'success',
+    message: 'Account Validated.',
+    token: token,
+    url: '70.153.137.6:17091',
+    accountType: 'growtopia',
+  }));
+}
 
   res.render(__dirname + '/public/html/dashboard.ejs', { data: tData });
 });
@@ -78,12 +80,12 @@ app.all('/player/growid/login/validate', (req, res) => {
   const growId = req.body.growId || '';
   const password = req.body.password || '';
 
-  const token = Buffer.from(
-    `_token=${_token}&growId=${growId}&password=${password}`
-  ).toString('base64');
+const token = Buffer.from(
+  `growId=${growId}&passwords=${password}`
+).toString('base64');
 
   res.send(
-    `{"status":"success","message":"Account Validated.","token":"${token}","url":"","accountType":"growtopia","accountAge":2}`
+    `{"status":"success","message":"Account Validated.","token":"${token}","url":"70.153.137.6:17091","accountType":"growtopia"}`
   );
 });
 
@@ -97,7 +99,7 @@ app.all('/player/growid/checktoken', (req, res) => {
         status: 'success',
         message: 'Account Validated.',
         token: refreshToken,
-        url: '',
+        url: '70.153.137.6:17091',
         accountType: 'growtopia',
     });
     } catch (error) {

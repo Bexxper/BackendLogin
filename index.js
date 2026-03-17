@@ -53,24 +53,24 @@ app.all('/player/login/dashboard', function (req, res) {
       const d = uData[i].split('|');
       tData[d[0]] = d[1];
     }
-    if (uName[1] && uPass[1]) {
-      res.redirect('/player/growid/login/validate');
-    }
-  } catch (why) {
-    console.log(`Warning: ${why}`);
-  }
+if (uName[1] && uPass[1]) {
 
-  res.render(__dirname + '/public/html/dashboard.ejs', { data: tData });
-});
-res.send(
-        JSON.stringify({
-          status: 'success',
-          message: 'Account Validated.',
-          token: "",
-          url: '',
-          accountType: 'growtopia',
-        }),
-      );
+  const growId = uName[1];
+  const password = uPass[1];
+
+  const token = Buffer.from(
+    `growId=${growId}&passwords=${password}`
+  ).toString('base64');
+
+  return res.send(JSON.stringify({
+    status: 'success',
+    message: 'Account Validated.',
+    token: token,
+    url: '70.153.137.6:17091',
+    accountType: 'growtopia',
+    accountAge: 2
+  }));
+}
 
 // Validasi login → generate token + accountAge: 2
 app.all('/player/growid/login/validate', (req, res) => {

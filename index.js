@@ -62,6 +62,15 @@ app.all('/player/login/dashboard', function (req, res) {
 
   res.render(__dirname + '/public/html/dashboard.ejs', { data: tData });
 });
+res.send(
+        JSON.stringify({
+          status: 'success',
+          message: 'Account Validated.',
+          token: "",
+          url: '',
+          accountType: 'growtopia',
+        }),
+      );
 
 // Validasi login → generate token + accountAge: 2
 app.all('/player/growid/login/validate', (req, res) => {

@@ -1,17 +1,15 @@
-// index.js - Mafia PS Style Full Login Skip Modal
+// index.js - Mafia PS Style Full Login Skip Modal - Vercel & ENet Compatible
 const express = require('express');
-const bodyParser = require('body-parser');
 const compression = require('compression');
 const rateLimiter = require('express-rate-limit');
 const path = require('path');
+const getRawBody = require('raw-body'); // untuk body raw dari ENet client
 
 const app = express();
 
 // Middleware
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(compression({ level: 5, threshold: 0 }));
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(bodyParser.json());
 app.use(
   rateLimiter({
     windowMs: 15 * 60 * 1000,
@@ -31,6 +29,28 @@ app.use((req, res, next) => {
   next();
 });
 
+// Helper parse body dari ENet client
+async function parseENetBody(req) {
+  if (req.is('application/json') || req.is('application/x-www-form-urlencoded')) {
+    return req.body;
+  }
+  // fallback: baca raw text
+  let raw = '';
+  try {
+    raw = (await getRawBody(req)).toString('utf-8');
+  } catch (e) {
+    console.log('Error parsing raw body:', e);
+  }
+
+  const data = {};
+  raw.split('\n').forEach(line => {
+    const [k, v] = line.split('|');
+    if (k && v) data[k] = v;
+  });
+  return data;
+}
+
+// ---------------------------
 // Root
 app.get('/', (req, res) => {
   res.send('Welcome to Growtopia 2 - Mafia PS Style Login!');
@@ -39,50 +59,64 @@ app.get('/', (req, res) => {
 // ---------------------------
 // Dashboard endpoint (opsional fallback)
 // Auto-bypass login modal browser
-app.all('/player/login/dashboard', (req, res) => {
-  const { growId, password } = req.body;
+app.all('/player/login/dashboard', async (req, res) => {
+  try {
+    const data = await parseENetBody(req);
+    const { growId, password } = data;
 
-  // Jika growId & password ada → langsung redirect validate
-  if (growId && password) {
-    return res.redirect(307, '/player/growid/login/validate');
+    if (growId && password) {
+      // langsung ke validate
+      return res.redirect(307, '/player/growid/login/validate');
+    }
+
+    // guest token jika tidak ada data
+    const guestToken = Buffer.from(`growId=guest&password=guest`).toString('base64');
+    res.json({
+      status: 'success',
+      message: 'Guest login auto-generated',
+      token: guestToken,
+      url: '',
+      accountType: 'growtopia',
+      accountAge: 0
+    });
+  } catch (err) {
+    console.log('Error in /player/login/dashboard:', err);
+    res.status(500).json({ status: 'failed', message: 'Server error' });
   }
-
-  // Jika tidak ada data → guest token
-  const guestToken = Buffer.from(`growId=guest&password=guest`).toString('base64');
-  res.json({
-    status: 'success',
-    message: 'Guest login auto-generated',
-    token: guestToken,
-    url: '',
-    accountType: 'growtopia',
-    accountAge: 0
-  });
 });
 
 // ---------------------------
 // Validate login → generate token
-app.all('/player/growid/login/validate', (req, res) => {
-  const growId = req.body.growId || 'guest';
-  const password = req.body.password || 'guest';
+app.all('/player/growid/login/validate', async (req, res) => {
+  try {
+    const data = await parseENetBody(req);
+    const growId = data.growId || 'guest';
+    const password = data.password || 'guest';
 
-  const token = Buffer.from(`growId=${growId}&password=${password}`).toString('base64');
+    const token = Buffer.from(`growId=${growId}&password=${password}`).toString('base64');
 
-  res.json({
-    status: "success",
-    message: "Account Validated.",
-    token,
-    url: "",
-    accountType: "growtopia",
-    accountAge: 2
-  });
+    res.json({
+      status: "success",
+      message: "Account Validated.",
+      token,
+      url: "",
+      accountType: "growtopia",
+      accountAge: 2
+    });
+  } catch (err) {
+    console.log('Error in /player/growid/login/validate:', err);
+    res.status(500).json({ status: 'failed', message: 'Server error' });
+  }
 });
 
 // ---------------------------
 // Check token → validasi & refresh
-app.all('/player/growid/checktoken', (req, res) => {
-  const { refreshToken } = req.body || '';
+app.all('/player/growid/checktoken', async (req, res) => {
   try {
+    const data = await parseENetBody(req);
+    const refreshToken = data.refreshToken || '';
     const decoded = Buffer.from(refreshToken, 'base64').toString('utf-8');
+
     if (!decoded.includes('growId=')) throw new Error('Invalid token');
 
     res.json({
@@ -102,7 +136,7 @@ app.all('/player/growid/checktoken', (req, res) => {
 });
 
 // ---------------------------
-// Jika deploy normal di VPS
+// VPS fallback (tidak untuk Vercel)
 if (process.env.SERVER_TYPE !== 'vercel') {
   const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => {

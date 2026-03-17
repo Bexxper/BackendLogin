@@ -1,126 +1,165 @@
-const express = require('express');
-const app = express();
-const bodyParser = require('body-parser');
-const rateLimiter = require('express-rate-limit');
-const compression = require('compression');
-const path = require('path');
+import express, { Request, Response, NextFunction } from 'express';
+import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(
-  compression({
-    level: 5,
-    threshold: 0,
-    filter: (req, res) => {
-      if (req.headers['x-no-compression']) {
-        return false;
-      }
-      return compression.filter(req, res);
-    },
-  }),
-);
-app.set('view engine', 'ejs');
+const app = express();
+const PORT = 3000;
+
+// trust proxy
 app.set('trust proxy', 1);
-app.use(function (req, res, next) {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header(
-    'Access-Control-Allow-Headers',
-    'Origin, X-Requested-With, Content-Type, Accept',
-  );
+
+// middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cors());
+
+// rate limiter
+const limiter = rateLimit({
+  windowMs: 60_000,
+  max: 50,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: { trustProxy: false, xForwardedForHeader: false },
+});
+app.use(limiter);
+
+// request logging
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const clientIp =
+    (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+    req.headers['x-real-ip'] ||
+    req.socket.remoteAddress ||
+    'unknown';
+
   console.log(
-    `[${new Date().toLocaleString()}] ${req.method} ${req.url} - ${
-      res.statusCode
-    }`,
+    `[REQ] ${req.method} ${req.path} → ${clientIp} | ${res.statusCode}`,
   );
   next();
 });
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(express.json());
-app.use(rateLimiter({ windowMs: 15 * 60 * 1000, max: 100, headers: true }));
 
-// Favicon
-app.get('/favicon.:ext', function (req, res) {
-  res.sendFile(path.join(__dirname, 'public', 'favicon.ico'));
+// root
+app.get('/', (_req: Request, res: Response) => {
+  res.send('Hello, world!');
 });
 
-// Dashboard login (frontend parsing tidak diubah)
-app.all('/player/login/dashboard', function (req, res) {
-  const tData = {};
-  try {
-    const uData = JSON.stringify(req.body).split('"')[1].split('\\n');
-    const uName = uData[0].split('|');
-    const uPass = uData[1].split('|');
+/**
+ * ✅ FIXED: dashboard langsung redirect (tidak render HTML lagi)
+ */
+app.all('/player/login/dashboard', async (req: Request, res: Response) => {
+  return res.redirect(307, '/player/growid/login/validate');
+});
 
-    for (let i = 0; i < uData.length - 1; i++) {
-      const d = uData[i].split('|');
-      tData[d[0]] = d[1];
+/**
+ * validate login
+ */
+app.all(
+  '/player/growid/login/validate',
+  async (req: Request, res: Response) => {
+    try {
+      const formData = req.body as Record<string, string>;
+
+      const _token = formData._token;
+      const growId = formData.growId;
+      const password = formData.password;
+      const email = formData.email;
+
+      let token = '';
+
+      if (email) {
+        token = Buffer.from(
+          `_token=${_token}&growId=${growId}&password=${password}&email=${email}&reg=1`,
+        ).toString('base64');
+      } else {
+        token = Buffer.from(
+          `_token=${_token}&growId=${growId}&password=${password}&reg=0`,
+        ).toString('base64');
+      }
+
+      res.send(
+        JSON.stringify({
+          status: 'success',
+          message: 'Account Validated.',
+          token,
+          url: '',
+          accountType: 'growtopia',
+        }),
+      );
+    } catch (error) {
+      console.log(`[ERROR]: ${error}`);
+      res.status(500).json({
+        status: 'error',
+        message: 'Internal Server Error',
+      });
     }
+  },
+);
 
-    if (uName[1] && uPass[1]) {
-      const growId = uName[1];
-      const password = uPass[1];
+/**
+ * checktoken step 1 → redirect
+ */
+app.all('/player/growid/checktoken', async (_req: Request, res: Response) => {
+  return res.redirect(307, '/player/growid/validate/checktoken');
+});
+
+/**
+ * checktoken step 2
+ */
+app.all(
+  '/player/growid/validate/checktoken',
+  async (req: Request, res: Response) => {
+    try {
+      const formData = req.body as Record<string, string>;
+
+      let refreshToken = formData.refreshToken;
+      let clientData = formData.clientData;
+
+      if (!refreshToken || !clientData) {
+        res.status(200).json({
+          status: 'error',
+          message: 'Missing refreshToken or clientData',
+        });
+        return;
+      }
+
+      let decodedRefreshToken = Buffer.from(
+        refreshToken,
+        'base64',
+      ).toString('utf-8');
+
+      // remove reg flag
+      decodedRefreshToken = decodedRefreshToken
+        .replace('&reg=0', '')
+        .replace('&reg=1', '');
 
       const token = Buffer.from(
-        `growId=${growId}&passwords=${password}`
+        decodedRefreshToken.replace(
+          /(_token=)[^&]*/,
+          `$1${Buffer.from(clientData).toString('base64')}`,
+        ),
       ).toString('base64');
 
-      return res.send(JSON.stringify({
-        status: 'success',
-        message: 'Account Validated.',
-        token: token,
-        url: '70.153.137.6:17091',
-        accountType: 'growtopia',
-        accountAge: 2
-      }));
-    }
-
-  } catch (why) {
-    console.log(`Warning: ${why}`);
-  }
-
-  // run kl ga login
-
-});
-
-// Validasi login → generate token + accountAge: 2
-app.all('/player/growid/login/validate', (req, res) => {
-  const _token = req.body._token || '';
-  const growId = req.body.growId || '';
-  const password = req.body.password || '';
-
-const token = Buffer.from(
-  `growId=${growId}&passwords=${password}`
-).toString('base64');
-
-  res.send(
-    `{"status":"success","message":"Account Validated.","token":"${token}","url":"70.153.137.6:17091","accountType":"growtopia"}`
-  );
-});
-
-// Check token → validasi dan refresh token + accountAge: 2
-app.all('/player/growid/checktoken', (req, res) => {
-    const { refreshToken } = req.body;
-    try {
-    const decoded = Buffer.from(refreshToken, 'base64').toString('utf-8');
-    if (typeof decoded !== 'string' && !decoded.startsWith('growId=') && !decoded.includes('passwords=')) return res.render(__dirname + '/public/html/dashboard.ejs');
-    res.json({
-        status: 'success',
-        message: 'Account Validated.',
-        token: refreshToken,
-        url: '70.153.137.6:17091',
-        accountType: 'growtopia',
-    });
+      res.send(
+        JSON.stringify({
+          status: 'success',
+          message: 'Account Validated.',
+          token,
+          url: '',
+          accountType: 'growtopia',
+          accountAge: 2,
+        }),
+      );
     } catch (error) {
-        console.log("Redirecting to player login dashboard");
-        res.render(__dirname + '/public/html/dashboard.ejs');
+      console.log(`[ERROR]: ${error}`);
+      res.status(200).json({
+        status: 'error',
+        message: 'Internal Server Error',
+      });
     }
+  },
+);
+
+app.listen(PORT, () => {
+  console.log(`[SERVER] Running on http://localhost:${PORT}`);
 });
 
-// Root
-app.get('/', function (req, res) {
-  res.send('Welcome to Growtopia 2!');
-});
-
-// Start server
-app.listen(5000, function () {
-  console.log('Listening on port 5000');
-});
+export default app;

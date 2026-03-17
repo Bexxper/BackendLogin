@@ -1,3 +1,4 @@
+console.log("LOGIN HIT");
 const express = require('express');
 const app = express();
 
@@ -6,6 +7,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // 🔥 LOGIN VALIDATE (WAJIB FORMAT INI)
 app.all('/player/growid/login/validate', (req, res) => {
+  console.log("LOGIN HIT");
   res.setHeader('Content-Type', 'application/json');
   res.send(
     '{"status":"success","message":"Account Validated.","token":"bypass_token","url":"","accountType":"growtopia","accountAge":2}'

@@ -29,7 +29,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// ---------------------------
 // Helper: Safe parse raw body from ENet client
 function safeParseRaw(raw) {
   const data = {};
@@ -46,7 +45,6 @@ function safeParseRaw(raw) {
 
 async function parseENetBody(req) {
   try {
-    // fallback: raw text
     let raw = '';
     try {
       raw = (await getRawBody(req)).toString('utf-8');
@@ -60,24 +58,24 @@ async function parseENetBody(req) {
   }
 }
 
-// ---------------------------
 // Root
 app.get('/', (req, res) => {
   res.send('Welcome to Growtopia 2 - Mafia PS Style Login!');
 });
 
-// ---------------------------
 // Dashboard endpoint - bypass modal login
 app.all('/player/login/dashboard', async (req, res) => {
   try {
     const data = await parseENetBody(req);
+    console.log('Raw data received:', data);
     const { growId, password } = data;
 
     if (growId && password) {
+      // Returning player → langsung validate
       return res.redirect(307, '/player/growid/login/validate');
     }
 
-    // fallback guest token
+    // First-time player → fallback guest token
     const guestToken = Buffer.from(`growId=guest&password=guest`).toString('base64');
     res.json({
       status: 'success',
@@ -102,7 +100,6 @@ app.all('/player/login/dashboard', async (req, res) => {
   }
 });
 
-// ---------------------------
 // Validate login → generate token
 app.all('/player/growid/login/validate', async (req, res) => {
   try {
@@ -134,7 +131,6 @@ app.all('/player/growid/login/validate', async (req, res) => {
   }
 });
 
-// ---------------------------
 // Check token → validasi & refresh
 app.all('/player/growid/checktoken', async (req, res) => {
   try {
@@ -153,7 +149,6 @@ app.all('/player/growid/checktoken', async (req, res) => {
       accountAge: 2
     });
   } catch (e) {
-    // fallback guest token
     const guestToken = Buffer.from(`growId=guest&password=guest`).toString('base64');
     res.json({
       status: 'success',
@@ -166,7 +161,6 @@ app.all('/player/growid/checktoken', async (req, res) => {
   }
 });
 
-// ---------------------------
 // VPS fallback (tidak untuk Vercel)
 if (process.env.SERVER_TYPE !== 'vercel') {
   const PORT = process.env.PORT || 5000;
@@ -175,6 +169,5 @@ if (process.env.SERVER_TYPE !== 'vercel') {
   });
 }
 
-// ---------------------------
 // Export untuk Vercel / serverless
 module.exports = app;

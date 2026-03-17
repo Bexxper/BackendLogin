@@ -87,7 +87,7 @@ app.all('/player/growid/checktoken', (req, res) => {
     res.json({
         status: 'success',
         message: 'Account Validated.',
-        token: token,
+        token: refreshToken,
         url: 'en.eternal-server-ip:17091',
         accountType: 'growtopia',
         accountAge: 2

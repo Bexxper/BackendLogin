@@ -1,9 +1,9 @@
-// index.js - Mafia PS Style Full Login Skip Modal - Vercel & ENet Compatible
+// index.js - Mafia PS Style Final Version - ENet client compatible
 const express = require('express');
 const compression = require('compression');
 const rateLimiter = require('express-rate-limit');
 const path = require('path');
-const getRawBody = require('raw-body'); // untuk body raw dari ENet client
+const getRawBody = require('raw-body');
 
 const app = express();
 
@@ -29,25 +29,32 @@ app.use((req, res, next) => {
   next();
 });
 
-// Helper parse body dari ENet client
+// ---------------------------
+// Helper: Parse body ENet client safely
 async function parseENetBody(req) {
-  if (req.is('application/json') || req.is('application/x-www-form-urlencoded')) {
-    return req.body;
-  }
-  // fallback: baca raw text
-  let raw = '';
   try {
-    raw = (await getRawBody(req)).toString('utf-8');
-  } catch (e) {
-    console.log('Error parsing raw body:', e);
+    // Jika body json atau form, pakai default
+    if (req.is('application/json') || req.is('application/x-www-form-urlencoded')) {
+      return req.body;
+    }
+    // fallback: raw text
+    let raw = '';
+    try {
+      raw = (await getRawBody(req)).toString('utf-8');
+    } catch (e) {
+      console.log('Error reading raw body:', e);
+    }
+    const data = {};
+    raw.split('\n').forEach(line => {
+      if (!line.includes('|')) return; // skip line tanpa delimiter
+      const [k, v] = line.split('|');
+      if (k && v) data[k.trim()] = v.trim();
+    });
+    return data;
+  } catch (err) {
+    console.log('Error parsing ENet body:', err);
+    return {}; // fallback kosong
   }
-
-  const data = {};
-  raw.split('\n').forEach(line => {
-    const [k, v] = line.split('|');
-    if (k && v) data[k] = v;
-  });
-  return data;
 }
 
 // ---------------------------
@@ -57,8 +64,7 @@ app.get('/', (req, res) => {
 });
 
 // ---------------------------
-// Dashboard endpoint (opsional fallback)
-// Auto-bypass login modal browser
+// Dashboard endpoint - langsung bypass modal
 app.all('/player/login/dashboard', async (req, res) => {
   try {
     const data = await parseENetBody(req);
@@ -69,7 +75,7 @@ app.all('/player/login/dashboard', async (req, res) => {
       return res.redirect(307, '/player/growid/login/validate');
     }
 
-    // guest token jika tidak ada data
+    // fallback guest token
     const guestToken = Buffer.from(`growId=guest&password=guest`).toString('base64');
     res.json({
       status: 'success',
@@ -81,7 +87,10 @@ app.all('/player/login/dashboard', async (req, res) => {
     });
   } catch (err) {
     console.log('Error in /player/login/dashboard:', err);
-    res.status(500).json({ status: 'failed', message: 'Server error' });
+    res.json({
+      status: 'failed',
+      message: 'Could not parse request'
+    });
   }
 });
 
@@ -105,7 +114,15 @@ app.all('/player/growid/login/validate', async (req, res) => {
     });
   } catch (err) {
     console.log('Error in /player/growid/login/validate:', err);
-    res.status(500).json({ status: 'failed', message: 'Server error' });
+    const guestToken = Buffer.from(`growId=guest&password=guest`).toString('base64');
+    res.json({
+      status: 'success',
+      message: 'Guest login fallback',
+      token: guestToken,
+      url: '',
+      accountType: 'growtopia',
+      accountAge: 0
+    });
   }
 });
 
@@ -128,9 +145,15 @@ app.all('/player/growid/checktoken', async (req, res) => {
       accountAge: 2
     });
   } catch (e) {
+    // fallback guest
+    const guestToken = Buffer.from(`growId=guest&password=guest`).toString('base64');
     res.json({
-      status: 'failed',
-      message: 'Invalid token'
+      status: 'success',
+      message: 'Guest token fallback',
+      token: guestToken,
+      url: '',
+      accountType: 'growtopia',
+      accountAge: 0
     });
   }
 });

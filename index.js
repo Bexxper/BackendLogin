@@ -4,43 +4,30 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 🔥 BYPASS LOGIN VALIDATE
+// 🔥 LOGIN VALIDATE (WAJIB FORMAT INI)
 app.all('/player/growid/login/validate', (req, res) => {
-  res.send({
-    status: "success",
-    message: "Account Validated.",
-    token: "bypass_token",
-    url: "",
-    accountType: "growtopia",
-    accountAge: 999
-  });
+  res.setHeader('Content-Type', 'application/json');
+  res.send(
+    '{"status":"success","message":"Account Validated.","token":"bypass_token","url":"","accountType":"growtopia","accountAge":2}'
+  );
 });
 
-// 🔥 BYPASS CHECK TOKEN
+// 🔥 CHECK TOKEN (WAJIB JUGA)
 app.all('/player/growid/checktoken', (req, res) => {
-  res.send({
-    status: "success",
-    message: "Account Validated.",
-    token: "bypass_token",
-    url: "",
-    accountType: "growtopia",
-    accountAge: 2
-  });
+  res.setHeader('Content-Type', 'application/json');
+  res.send(
+    '{"status":"success","message":"Account Validated.","token":"bypass_token","url":"","accountType":"growtopia","accountAge":2}'
+  );
 });
 
-// 🔥 OPTIONAL: DASHBOARD LANGSUNG LEWAT
+// 🔥 DASHBOARD → KASIH RESPONSE KOSONG / HTML
 app.all('/player/login/dashboard', (req, res) => {
-  res.send("OK");
+  res.send('<html><body>OK</body></html>');
 });
 
-// 🔥 SEMUA REQUEST LAIN → OK AJA
-app.all('*', (req, res) => {
-  res.send("OK");
-});
-
-// ROOT
+// 🔥 JANGAN override semua route jadi "OK"
 app.get('/', (req, res) => {
-  res.send('Bypass Login Active');
+  res.send('Bypass Active');
 });
 
 app.listen(5000, () => {

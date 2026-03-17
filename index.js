@@ -69,32 +69,13 @@ app.all('/player/growid/login/validate', (req, res) => {
   const growId = req.body.growId || '';
   const password = req.body.password || '';
 
-const token = Buffer.from(
-  `growId=${growId}&passwords=${password}`
-).toString('base64');
-
-res.send(
-  `{"status":"success","message":"Account Validated.","token":"${token}","url":"70.153.137.6:17091","accountType":"growtopia","accountAge":2}`
-);
-});
-
-// Guest login (auto-generated)
-app.post('/player/growid/login/guest', (req, res) => {
-  const growId = `guest${Math.floor(Math.random() * 9999)}`;
-  const password = 'guest';
-
   const token = Buffer.from(
-    `growId=${growId}&passwords=${password}`
+    `_token=${_token}&growId=${growId}&password=${password}`
   ).toString('base64');
 
-  res.json({
-    status: "success",
-    message: "Guest login auto-generated",
-    token: token,
-    url: "70.153.137.6:17091",
-    accountType: "growtopia",
-    accountAge: 0
-  });
+  res.send(
+    `{"status":"success","message":"Account Validated.","token":"${token}","url":"","accountType":"growtopia","accountAge":2}`
+  );
 });
 
 // Check token → validasi dan refresh token + accountAge: 2
@@ -107,9 +88,8 @@ app.all('/player/growid/checktoken', (req, res) => {
         status: 'success',
         message: 'Account Validated.',
         token: refreshToken,
-        url: '70.153.137.6:17091',
+        url: '',
         accountType: 'growtopia',
-        accountAge: 2
     });
     } catch (error) {
         console.log("Redirecting to player login dashboard");

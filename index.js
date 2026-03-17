@@ -69,26 +69,29 @@ app.all('/player/growid/login/validate', (req, res) => {
   const growId = req.body.growId || '';
   const password = req.body.password || '';
 
-  const token = Buffer.from(
-    `_token=${_token}&growId=${growId}&password=${password}`
-  ).toString('base64');
+const token = Buffer.from(
+  `growId=${growId}&passwords=${password}`
+).toString('base64');
 
-  res.send(
-    `{"status":"success","message":"Account Validated.","token":"${token}","url":"","accountType":"growtopia","accountAge":2}`
-  );
+res.send(
+  `{"status":"success","message":"Account Validated.","token":"${token}","url":"70.153.137.6:17091","accountType":"growtopia","accountAge":2}`
+);
 });
 
-// Guest login (auto-generated account)
+// Guest login (auto-generated)
 app.post('/player/growid/login/guest', (req, res) => {
-  const growId = `guest${Math.floor(Math.random() * 9999)}`; // generate guest ID
-  const password = 'guest'; // default password
-  const token = Buffer.from(`growId=${growId}&passwords=${password}`).toString('base64');
+  const growId = `guest${Math.floor(Math.random() * 9999)}`;
+  const password = 'guest';
+
+  const token = Buffer.from(
+    `growId=${growId}&passwords=${password}`
+  ).toString('base64');
 
   res.json({
     status: "success",
     message: "Guest login auto-generated",
     token: token,
-    url: "70.153.137.6:17091", // IP + port server kamu
+    url: "70.153.137.6:17091",
     accountType: "growtopia",
     accountAge: 0
   });

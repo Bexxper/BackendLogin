@@ -78,7 +78,7 @@ app.all('/player/login/dashboard', function (req, res) {
   }
 
   // run kl ga login
-  return res.render(__dirname + '/public/html/dashboard.ejs', { data: tData });
+
 });
 
 // Validasi login → generate token + accountAge: 2

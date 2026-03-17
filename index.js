@@ -77,7 +77,7 @@ app.all('/player/login/dashboard', function (req, res) {
     console.log(`Warning: ${why}`);
   }
 
-  // ✅ HANYA jalan kalau tidak login
+  // run kl ga login
   return res.render(__dirname + '/public/html/dashboard.ejs', { data: tData });
 });
 
